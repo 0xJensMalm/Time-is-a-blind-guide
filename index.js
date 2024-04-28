@@ -1,14 +1,14 @@
 const config = {
-  gridSizeFactor: 2, // Scale factor for grid size
+  gridSizeFactor: 5, // Scale factor for grid size
   gridRatio: { rows: 8, cols: 6 }, // Aspect ratio for grid
   padding: { top: 100, left: 20, right: 20, bottom: 20 },
-  clockScaleFactor: 0.95, // Factor of cell size used for the clock diameter
-  dialStrokeScale: 0.1, // Scale factor for dial stroke width based on clock diameter
-  noiseScale: 0.01, // f.eks 0.01 -> 0.1
-  noiseOffset1: 1000, // Offset to differentiate the noise layers
-  noiseOffset2: 3000, // Another offset for the second layer
-  animationSpeed: 0.01, // Speed at which clocks animate towards their target
-  currentRule: "quarter", // or "quarter" for the new rule
+  clockScaleFactor: 0.95,
+  dialStrokeScale: 0.15,
+  noiseScale: 0.03, // f.eks 0.01 -> 0.1
+  noiseOffset1: 1000, //undersøk
+  noiseOffset2: 3000, //undersøk
+  animationSpeed: 0.01,
+  currentRule: "rectangle",
   themes: {
     cleanRetro: {
       bg: "#ffbb6c",
@@ -35,7 +35,7 @@ const config = {
       sDial: "#66aeaa",
     },
   },
-  currentTheme: "cleanRetro",
+  currentTheme: "ducciA",
 };
 
 class Clock {
@@ -51,8 +51,21 @@ class Clock {
     this.targetDial2 = this.dial2;
   }
   animateToTarget() {
-    this.dial1 += (this.targetDial1 - this.dial1) * config.animationSpeed;
-    this.dial2 += (this.targetDial2 - this.dial2) * config.animationSpeed;
+    const stepSize = PI / 180; // This controls the speed of the animation, adjust as needed
+
+    // Move dial1 towards targetDial1
+    if (abs(this.targetDial1 - this.dial1) > stepSize) {
+      this.dial1 += stepSize * Math.sign(this.targetDial1 - this.dial1);
+    } else {
+      this.dial1 = this.targetDial1; // Snap to the target if within one step size
+    }
+
+    // Move dial2 towards targetDial2
+    if (abs(this.targetDial2 - this.dial2) > stepSize) {
+      this.dial2 += stepSize * Math.sign(this.targetDial2 - this.dial2);
+    } else {
+      this.dial2 = this.targetDial2; // Snap to the target if within one step size
+    }
   }
 
   display() {
@@ -116,12 +129,13 @@ class Grid {
     }
     return clocks;
   }
-
   applyAlignmentRules() {
     if (config.currentRule === "noise") {
       this.applyNoiseBasedAlignment();
     } else if (config.currentRule === "quarter") {
       this.applyQuarterAlignment();
+    } else if (config.currentRule === "rectangle") {
+      this.applyRectanglePattern();
     }
   }
 
@@ -148,6 +162,72 @@ class Grid {
         let baseAngle = floor(random(4)) * HALF_PI; // Randomly choose 0, 90, 180, 270 degrees
         current.targetDial1 = baseAngle;
         current.targetDial2 = (baseAngle + HALF_PI) % TWO_PI; // 90 degrees apart
+      }
+    }
+  }
+
+  applyRectanglePattern() {
+    const layerCount = Math.min(this.rows, this.cols) / 2; // Determine the number of layers based on the smallest grid dimension
+
+    for (let i = 0; i < this.rows; i++) {
+      for (let j = 0; j < this.cols; j++) {
+        let minDistToEdge = Math.min(
+          i,
+          j,
+          this.rows - 1 - i,
+          this.cols - 1 - j
+        );
+        let layer = Math.floor(minDistToEdge / 2); // Determine which layer the current clock is in
+        let isEdge =
+          i === 0 || i === this.rows - 1 || j === 0 || j === this.cols - 1;
+        let isCorner =
+          (i === 0 || i === this.rows - 1) && (j === 0 || j === this.cols - 1);
+        let current = this.clocks[i][j];
+
+        if (isCorner) {
+          if (i === 0 && j === 0) {
+            // Top-Left Corner
+            current.targetDial1 = 0;
+            current.targetDial2 = Math.PI / 2;
+          } else if (i === 0 && j === this.cols - 1) {
+            // Top-Right Corner
+            current.targetDial1 = Math.PI;
+            current.targetDial2 = Math.PI / 2;
+          } else if (i === this.rows - 1 && j === 0) {
+            // Bottom-Left Corner
+            current.targetDial1 = 0;
+            current.targetDial2 = 1.5 * Math.PI;
+          } else if (i === this.rows - 1 && j === this.cols - 1) {
+            // Bottom-Right Corner
+            current.targetDial1 = Math.PI;
+            current.targetDial2 = 1.5 * Math.PI;
+          }
+        } else if (isEdge) {
+          if (i === 0 || i === this.rows - 1) {
+            // Top or bottom row
+            current.targetDial1 = 0; // Horizontal
+            current.targetDial2 = Math.PI;
+          } else {
+            // Left or right column
+            current.targetDial1 = Math.PI / 2; // Vertical
+            current.targetDial2 = 1.5 * Math.PI;
+          }
+        } else {
+          // Internal clocks mimic the nearest edge's orientation
+          let nearestEdgeVertical = j <= this.cols / 2 ? 0 : this.cols - 1;
+          let nearestEdgeHorizontal = i <= this.rows / 2 ? 0 : this.rows - 1;
+
+          if (
+            Math.abs(j - nearestEdgeVertical) <
+            Math.abs(i - nearestEdgeHorizontal)
+          ) {
+            current.targetDial1 = Math.PI / 2;
+            current.targetDial2 = 1.5 * Math.PI;
+          } else {
+            current.targetDial1 = 0;
+            current.targetDial2 = Math.PI;
+          }
+        }
       }
     }
   }
