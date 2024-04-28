@@ -1,38 +1,46 @@
 const config = {
-  gridSizeFactor: 5, // Scale factor for grid size
+  gridSizeFactor: 3, // Scale factor for grid size
   gridRatio: { rows: 8, cols: 6 }, // Aspect ratio for grid
   padding: { top: 100, left: 20, right: 20, bottom: 20 },
   clockScaleFactor: 0.95,
-  dialStrokeScale: 0.15,
+  dialStrokeScale: 0.1,
   noiseScale: 0.03, // f.eks 0.01 -> 0.1
-  noiseOffset1: 1000, //undersøk
-  noiseOffset2: 3000, //undersøk
-  animationSpeed: 0.01,
-  currentRule: "rectangle",
+  noiseOffset1: 1000,
+  animationSpeed: 0.01, //funker ikke
+  frameThickness: 10,
+  currentRule: "rectangle", //gradient //rectangle //noise //quarter
   themes: {
     cleanRetro: {
       bg: "#ffbb6c",
       clockface: "#ffffff",
       bDial: "#000000",
       sDial: "#000000",
+      titleColor: "#333333",
+      frameColor: "#222222", // Dark frame for a vintage look
     },
     golidTricolor: {
       bg: "#1f1e43",
       clockface: "#f8cb57",
       bDial: "#57b7ab",
       sDial: "#ec653b",
+      titleColor: "#f8cb57",
+      frameColor: "#ffffff", // White frame to contrast dark background
     },
     ducciA: {
       bg: "#ebdec5",
       clockface: "#d39a0e",
       bDial: "#000000",
       sDial: "#000000",
+      titleColor: "#d39a0e",
+      frameColor: "#8a7f8d", // Complementary frame color
     },
     cc232: {
       bg: "#ff7044",
       clockface: "#5d5f46",
       bDial: "#ffce3a",
       sDial: "#66aeaa",
+      titleColor: "#ffffff",
+      frameColor: "#000000", // Black frame for strong contrast
     },
   },
   currentTheme: "ducciA",
@@ -49,44 +57,49 @@ class Clock {
     this.shortDialLength = this.diameter * 0.35;
     this.targetDial1 = this.dial1;
     this.targetDial2 = this.dial2;
+    this.isContinuous = false;
   }
   animateToTarget() {
-    const stepSize = PI / 180; // This controls the speed of the animation, adjust as needed
-
-    // Move dial1 towards targetDial1
-    if (abs(this.targetDial1 - this.dial1) > stepSize) {
-      this.dial1 += stepSize * Math.sign(this.targetDial1 - this.dial1);
+    if (this.isContinuous) {
+      this.dial1 += this.continuousSpeed1; // Long dial speed
+      this.dial2 += this.continuousSpeed2; // Short dial speed
     } else {
-      this.dial1 = this.targetDial1; // Snap to the target if within one step size
-    }
-
-    // Move dial2 towards targetDial2
-    if (abs(this.targetDial2 - this.dial2) > stepSize) {
-      this.dial2 += stepSize * Math.sign(this.targetDial2 - this.dial2);
-    } else {
-      this.dial2 = this.targetDial2; // Snap to the target if within one step size
+      const stepSize = PI / 180;
+      if (abs(this.targetDial1 - this.dial1) > stepSize) {
+        this.dial1 += stepSize * Math.sign(this.targetDial1 - this.dial1);
+      } else {
+        this.dial1 = this.targetDial1;
+      }
+      if (abs(this.targetDial2 - this.dial2) > stepSize) {
+        this.dial2 += stepSize * Math.sign(this.targetDial2 - this.dial2);
+      } else {
+        this.dial2 = this.targetDial2;
+      }
     }
   }
 
   display() {
     const theme = config.themes[config.currentTheme];
-    console.log("Current Theme: ", config.currentTheme); // Debug current theme
-    console.log("Big Dial Color: ", theme.bDial); // Debug color value
-    console.log("Small Dial Color: ", theme.sDial); // Debug color value
+    const strokeScale = this.diameter * config.dialStrokeScale;
 
-    const strokeScale = this.diameter * config.dialStrokeScale; // Calculate stroke based on clock diameter
     push();
-    stroke(theme.bDial);
+    const speedColor = lerpColor(
+      color(theme.sDial),
+      color(theme.bDial),
+      this.continuousSpeed1 / 0.05
+    );
+    stroke(speedColor);
     fill(theme.clockface);
     ellipse(this.x, this.y, this.diameter);
-    strokeWeight(strokeScale); // Use scaled stroke width
+    strokeWeight(strokeScale);
+
     line(
       this.x,
       this.y,
       this.x + cos(this.dial1) * this.longDialLength,
       this.y + sin(this.dial1) * this.longDialLength
     );
-    stroke(theme.sDial); // Ensure this stroke setting takes effect for small dial
+    stroke(theme.sDial); // Default color or change based on conditions
     line(
       this.x,
       this.y,
@@ -129,6 +142,7 @@ class Grid {
     }
     return clocks;
   }
+
   applyAlignmentRules() {
     if (config.currentRule === "noise") {
       this.applyNoiseBasedAlignment();
@@ -136,6 +150,10 @@ class Grid {
       this.applyQuarterAlignment();
     } else if (config.currentRule === "rectangle") {
       this.applyRectanglePattern();
+    } else if (config.currentRule === "circle") {
+      this.applyCirclePattern();
+    } else if (config.currentRule === "gradient") {
+      this.applyGradientContinuousMovement();
     }
   }
 
@@ -232,6 +250,43 @@ class Grid {
     }
   }
 
+  applyCirclePattern() {
+    const centerX = this.cols / 2;
+    const centerY = this.rows / 2;
+
+    for (let i = 0; i < this.rows; i++) {
+      for (let j = 0; j < this.cols; j++) {
+        let dx = j - centerX;
+        let dy = i - centerY;
+        let angle = Math.atan2(dy, dx) + Math.PI; // Point towards the center
+        let current = this.clocks[i][j];
+        current.targetDial1 = angle;
+        current.targetDial2 = angle + Math.PI / 2;
+        current.isContinuous = false; // Ensure this is reset for proper behavior
+      }
+    }
+  }
+
+  applyGradientContinuousMovement() {
+    const centerX = this.cols / 2;
+    const centerY = this.rows / 2;
+    const maxDistance = Math.sqrt(centerX * centerX + centerY * centerY);
+
+    for (let i = 0; i < this.rows; i++) {
+      for (let j = 0; j < this.cols; j++) {
+        let dx = j - centerX;
+        let dy = i - centerY;
+        let distance = Math.sqrt(dx * dx + dy * dy);
+        let baseSpeed = map(distance, 0, maxDistance, 0.05, 0.01); // Speed base on distance from center
+
+        let current = this.clocks[i][j];
+        current.continuousSpeed1 = baseSpeed * 2; // Long dial moves at twice the base speed
+        current.continuousSpeed2 = baseSpeed; // Short dial moves at the base speed
+        current.isContinuous = true;
+      }
+    }
+  }
+
   display() {
     this.clocks.forEach((row) => row.forEach((clock) => clock.display()));
   }
@@ -244,8 +299,25 @@ function preload() {
   customFont = loadFont("font.ttf"); // Load the custom font
 }
 
+function adjustCanvasSize() {
+  let maxWidth = windowWidth;
+  let maxHeight = windowHeight;
+  let aspectRatio = 3 / 4; // Your desired aspect ratio (width / height)
+
+  // Calculate the maximum size maintaining the aspect ratio
+  if (maxWidth > maxHeight * aspectRatio) {
+    maxWidth = maxHeight * aspectRatio;
+  } else {
+    maxHeight = maxWidth / aspectRatio;
+  }
+
+  // Resize the canvas
+  resizeCanvas(maxWidth, maxHeight);
+}
+
 function setup() {
   createCanvas(600, 800); // Set canvas size
+  adjustCanvasSize();
   grid = new Grid(
     config.gridRatio.rows * config.gridSizeFactor,
     config.gridRatio.cols * config.gridSizeFactor
@@ -253,15 +325,50 @@ function setup() {
   grid.applyAlignmentRules();
   textFont(customFont); // Set the loaded font as the default font
 }
+function windowResized() {
+  adjustCanvasSize(); // Adjust canvas size when the window is resized
+}
 
 function draw() {
+  // Set background and configure text properties
   background(config.themes[config.currentTheme].bg);
-  fill(0); // Set text color
-  textSize(32); // Set text size
+  fill(config.themes[config.currentTheme].titleColor);
+  textSize(20);
   textAlign(CENTER, CENTER);
-  text("Time is a blind guide", width / 2, config.padding.top / 2); //
+  text("Time is a blind guide", width / 2, config.padding.top / 2);
 
+  // Display all clocks on the grid
   grid.display();
+
+  // Draw the frame around the canvas
+  stroke(config.themes[config.currentTheme].frameColor);
+  strokeWeight(config.frameThickness);
+  noFill();
+  rect(0, 0, width, height);
+
+  strokeWeight(1); // Reset stroke weight to a default value appropriate for other elements
+
   grid.clocks.forEach((row) => row.forEach((clock) => clock.animateToTarget()));
   config.noiseOffset1 += 0.01; // Increment to animate the noise effect dynamically
+}
+
+function keyPressed() {
+  if (key === "Q" || key === "q") {
+    // Checks if 'Q' is pressed
+    // Cycle through the theme names
+    const themeNames = Object.keys(config.themes);
+    let currentThemeIndex = themeNames.indexOf(config.currentTheme);
+    currentThemeIndex = (currentThemeIndex + 1) % themeNames.length;
+    config.currentTheme = themeNames[currentThemeIndex];
+    console.log("Theme changed to: " + config.currentTheme); // Log the theme change
+  } else if (key === "E" || key === "e") {
+    // Checks if 'E' is pressed
+    // Cycle through the rules
+    const ruleNames = ["noise", "quarter", "rectangle", "circle", "gradient"]; // List all your rules here
+    let currentRuleIndex = ruleNames.indexOf(config.currentRule);
+    currentRuleIndex = (currentRuleIndex + 1) % ruleNames.length;
+    config.currentRule = ruleNames[currentRuleIndex];
+    grid.applyAlignmentRules(); // Re-apply rules to update the grid display
+    console.log("Rule changed to: " + config.currentRule); // Log the rule change
+  }
 }
