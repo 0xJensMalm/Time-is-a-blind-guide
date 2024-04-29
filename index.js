@@ -1,5 +1,5 @@
 const config = {
-  gridSizeFactor: 3, // Scale factor for grid size
+  gridSizeFactor: 2, // Scale factor for grid size
   gridRatio: { rows: 8, cols: 6 }, // Aspect ratio for grid
   padding: { top: 100, left: 20, right: 20, bottom: 20 },
   clockScaleFactor: 0.95,
@@ -19,7 +19,7 @@ const config = {
       clockface: "#ffffff",
       bDial: "#000000",
       sDial: "#000000",
-      titleColor: "#333333",
+      titleColor: "#FFFFFFF",
       frameColor: "#222222",
       clockStrokeColor: "#000000",
       quarterMarkColor: "#333333",
@@ -41,8 +41,8 @@ const config = {
       sDial: "#000000",
       titleColor: "#d39a0e",
       frameColor: "#8a7f8d",
-      clockStrokeColor: "#8a7f8d",
-      quarterMarkColor: "#8a7f8d",
+      clockStrokeColor: "#000000",
+      quarterMarkColor: "#000000",
     },
     cc232: {
       bg: "#ff7044",
@@ -53,6 +53,26 @@ const config = {
       frameColor: "#000000",
       clockStrokeColor: "#ffffff",
       quarterMarkColor: "#ffffff",
+    },
+    tropicalSunrise: {
+      bg: "#54fefe",
+      clockface: "#fdfc53",
+      bDial: "#fe53fd",
+      sDial: "#fe53fd",
+      titleColor: "#fdfc53",
+      frameColor: "#5354fd",
+      clockStrokeColor: "#000000",
+      quarterMarkColor: "#000000",
+    },
+    coolMint: {
+      bg: "#b2f7ef", // Mint green background
+      clockface: "#edfffc", // Very light cyan for the clock face
+      bDial: "#66bfbf", // Strong cyan for the big dial
+      sDial: "#34675c", // Dark slate for the small dial
+      titleColor: "#ffffff", // White for clear title visibility
+      frameColor: "#03396c", // Navy blue frame to anchor the light tones
+      clockStrokeColor: "#03396c", // Navy blue for contrast with the mint background
+      quarterMarkColor: "#ffffff", // White for a clean look on the cyan clock face
     },
   },
   currentTheme: "cleanRetro",
@@ -338,9 +358,12 @@ class Grid {
 
 let grid;
 let customFont;
+let titleWords;
+let currentTitle;
 
 function preload() {
-  customFont = loadFont("font.otf"); // Load the custom font
+  titleWords = loadJSON("words.json");
+  customFont = loadFont("font.otf");
 }
 
 function adjustCanvasSize() {
@@ -368,9 +391,27 @@ function setup() {
   );
   grid.applyAlignmentRules();
   textFont(customFont); // Set the loaded font as the default font
+  currentTitle = generateTitle();
 }
+
 function windowResized() {
   adjustCanvasSize(); // Adjust canvas size when the window is resized
+}
+
+function generateTitle() {
+  const adj = random(titleWords.adjectives);
+  const noun = random(titleWords.nouns);
+  const article = selectArticle(adj); // Get the correct article based on the adjective
+  return `Time is ${article} ${adj} ${noun}`;
+}
+
+function selectArticle(word) {
+  const vowels = ["a", "e", "i", "o", "u"];
+  // Check if the first letter of the word is a vowel
+  if (vowels.includes(word[0].toLowerCase())) {
+    return "an";
+  }
+  return "a";
 }
 
 function draw() {
@@ -389,7 +430,7 @@ function draw() {
   strokeWeight(config.titleStrokeThickness);
   textSize(20);
   textAlign(CENTER, CENTER);
-  text("Time is a blind guide", width / 2, config.padding.top / 2);
+  text(currentTitle, width / 2, config.padding.top / 2); // Use 'currentTitle' instead of 'title'
 
   // Display all clocks on the grid
   grid.display();
