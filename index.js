@@ -3,12 +3,16 @@ const config = {
   gridRatio: { rows: 8, cols: 6 }, // Aspect ratio for grid
   padding: { top: 100, left: 20, right: 20, bottom: 20 },
   clockScaleFactor: 0.95,
+  titleStrokeColor: "#000000",
+  titleStrokeThickness: 2,
+
+  clockStrokeThickness: 1,
   dialStrokeScale: 0.1,
   noiseScale: 0.03, // f.eks 0.01 -> 0.1
   noiseOffset1: 1000,
   animationSpeed: 0.01, //funker ikke
   frameThickness: 10,
-  currentRule: "rectangle", //gradient //rectangle //noise //quarter
+  currentRule: "noise", //gradient //rectangle //noise //quarter
   themes: {
     cleanRetro: {
       bg: "#ffbb6c",
@@ -16,15 +20,19 @@ const config = {
       bDial: "#000000",
       sDial: "#000000",
       titleColor: "#333333",
-      frameColor: "#222222", // Dark frame for a vintage look
+      frameColor: "#222222",
+      clockStrokeColor: "#000000",
+      quarterMarkColor: "#333333",
     },
-    golidTricolor: {
-      bg: "#1f1e43",
-      clockface: "#f8cb57",
-      bDial: "#57b7ab",
-      sDial: "#ec653b",
-      titleColor: "#f8cb57",
-      frameColor: "#ffffff", // White frame to contrast dark background
+    midnight: {
+      bg: "#010c1e",
+      clockface: "#001e38",
+      bDial: "#c6cdd7",
+      sDial: "#d5d9e0",
+      titleColor: "#c6cdd7",
+      frameColor: "#4a6d88",
+      clockStrokeColor: "#ffffff",
+      quarterMarkColor: "#ffce3a",
     },
     ducciA: {
       bg: "#ebdec5",
@@ -32,7 +40,9 @@ const config = {
       bDial: "#000000",
       sDial: "#000000",
       titleColor: "#d39a0e",
-      frameColor: "#8a7f8d", // Complementary frame color
+      frameColor: "#8a7f8d",
+      clockStrokeColor: "#8a7f8d",
+      quarterMarkColor: "#8a7f8d",
     },
     cc232: {
       bg: "#ff7044",
@@ -40,10 +50,12 @@ const config = {
       bDial: "#ffce3a",
       sDial: "#66aeaa",
       titleColor: "#ffffff",
-      frameColor: "#000000", // Black frame for strong contrast
+      frameColor: "#000000",
+      clockStrokeColor: "#ffffff",
+      quarterMarkColor: "#ffffff",
     },
   },
-  currentTheme: "ducciA",
+  currentTheme: "cleanRetro",
 };
 
 class Clock {
@@ -59,6 +71,7 @@ class Clock {
     this.targetDial2 = this.dial2;
     this.isContinuous = false;
   }
+
   animateToTarget() {
     if (this.isContinuous) {
       this.dial1 += this.continuousSpeed1; // Long dial speed
@@ -81,31 +94,49 @@ class Clock {
   display() {
     const theme = config.themes[config.currentTheme];
     const strokeScale = this.diameter * config.dialStrokeScale;
+    const tickLength = this.diameter * 0.1; // Length of the quarter marks
 
     push();
+    // Draw the outer circle of the clock
+    stroke(theme.clockStrokeColor);
+    strokeWeight(config.clockStrokeThickness);
+    fill(theme.clockface);
+    ellipse(this.x, this.y, this.diameter);
+
+    // Drawing quarter marks
+    stroke(theme.quarterMarkColor);
+    strokeWeight(1);
+    for (let angle = 0; angle < 360; angle += 90) {
+      const rad = radians(angle);
+      const xStart = this.x + cos(rad) * (this.diameter / 2 - tickLength);
+      const yStart = this.y + sin(rad) * (this.diameter / 2 - tickLength);
+      const xEnd = this.x + cos(rad) * (this.diameter / 2);
+      const yEnd = this.y + sin(rad) * (this.diameter / 2);
+      line(xStart, yStart, xEnd, yEnd);
+    }
+
+    // Drawing dials
     const speedColor = lerpColor(
       color(theme.sDial),
       color(theme.bDial),
       this.continuousSpeed1 / 0.05
     );
-    stroke(speedColor);
-    fill(theme.clockface);
-    ellipse(this.x, this.y, this.diameter);
     strokeWeight(strokeScale);
-
+    stroke(speedColor);
     line(
       this.x,
       this.y,
       this.x + cos(this.dial1) * this.longDialLength,
       this.y + sin(this.dial1) * this.longDialLength
     );
-    stroke(theme.sDial); // Default color or change based on conditions
+    stroke(theme.sDial);
     line(
       this.x,
       this.y,
       this.x + cos(this.dial2) * this.shortDialLength,
       this.y + sin(this.dial2) * this.shortDialLength
     );
+
     pop();
   }
 }
@@ -144,20 +175,33 @@ class Grid {
   }
 
   applyAlignmentRules() {
-    if (config.currentRule === "noise") {
-      this.applyNoiseBasedAlignment();
-    } else if (config.currentRule === "quarter") {
-      this.applyQuarterAlignment();
-    } else if (config.currentRule === "rectangle") {
-      this.applyRectanglePattern();
-    } else if (config.currentRule === "circle") {
-      this.applyCirclePattern();
-    } else if (config.currentRule === "gradient") {
-      this.applyGradientContinuousMovement();
+    console.log("Applying rule: " + config.currentRule); // Log which rule is being applied
+    this.clocks.forEach((row) =>
+      row.forEach((clock) => (clock.isContinuous = false))
+    );
+    switch (config.currentRule) {
+      case "noise":
+        this.applyNoiseBasedAlignment();
+        break;
+      case "quarter":
+        this.applyQuarterAlignment();
+        break;
+      case "rectangle":
+        this.applyRectanglePattern();
+        break;
+      case "circle":
+        this.applyCirclePattern();
+        break;
+      case "gradient":
+        this.applyGradientContinuousMovement();
+        break;
+      default:
+        console.log("Unknown rule: " + config.currentRule);
     }
   }
 
   applyNoiseBasedAlignment() {
+    console.log("Applying noise-based alignment");
     let baseNoiseX = config.noiseOffset1;
     for (let i = 0; i < this.rows; i++) {
       for (let j = 0; j < this.cols; j++) {
@@ -296,7 +340,7 @@ let grid;
 let customFont;
 
 function preload() {
-  customFont = loadFont("font.ttf"); // Load the custom font
+  customFont = loadFont("font.otf"); // Load the custom font
 }
 
 function adjustCanvasSize() {
@@ -330,9 +374,19 @@ function windowResized() {
 }
 
 function draw() {
-  // Set background and configure text properties
   background(config.themes[config.currentTheme].bg);
+
+  grid.clocks.forEach((row) =>
+    row.forEach((clock) => {
+      clock.animateToTarget(); // Ensure this method is invoked
+      clock.display(); // Then display the updated state
+    })
+  );
+
+  // Set title color, stroke color, and thickness
   fill(config.themes[config.currentTheme].titleColor);
+  stroke(config.titleStrokeColor);
+  strokeWeight(config.titleStrokeThickness);
   textSize(20);
   textAlign(CENTER, CENTER);
   text("Time is a blind guide", width / 2, config.padding.top / 2);
@@ -347,28 +401,21 @@ function draw() {
   rect(0, 0, width, height);
 
   strokeWeight(1); // Reset stroke weight to a default value appropriate for other elements
-
-  grid.clocks.forEach((row) => row.forEach((clock) => clock.animateToTarget()));
-  config.noiseOffset1 += 0.01; // Increment to animate the noise effect dynamically
 }
 
 function keyPressed() {
   if (key === "Q" || key === "q") {
-    // Checks if 'Q' is pressed
-    // Cycle through the theme names
     const themeNames = Object.keys(config.themes);
     let currentThemeIndex = themeNames.indexOf(config.currentTheme);
     currentThemeIndex = (currentThemeIndex + 1) % themeNames.length;
     config.currentTheme = themeNames[currentThemeIndex];
-    console.log("Theme changed to: " + config.currentTheme); // Log the theme change
+    console.log("Theme changed to: " + config.currentTheme);
   } else if (key === "E" || key === "e") {
-    // Checks if 'E' is pressed
-    // Cycle through the rules
-    const ruleNames = ["noise", "quarter", "rectangle", "circle", "gradient"]; // List all your rules here
+    const ruleNames = ["noise", "quarter", "rectangle", "circle", "gradient"];
     let currentRuleIndex = ruleNames.indexOf(config.currentRule);
     currentRuleIndex = (currentRuleIndex + 1) % ruleNames.length;
     config.currentRule = ruleNames[currentRuleIndex];
-    grid.applyAlignmentRules(); // Re-apply rules to update the grid display
-    console.log("Rule changed to: " + config.currentRule); // Log the rule change
+    grid.applyAlignmentRules();
+    console.log("Rule changed to: " + config.currentRule);
   }
 }
