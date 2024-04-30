@@ -12,7 +12,8 @@ const config = {
   noiseOffset1: 1000,
   animationSpeed: 0.01, //funker ikke
   frameThickness: 10,
-  currentRule: "noise", //gradient //rectangle //noise //quarter
+  currentRule: "quarter",
+
   themes: {
     cleanRetro: {
       bg: "#ffbb6c",
@@ -94,8 +95,11 @@ class Clock {
 
   animateToTarget() {
     if (this.isContinuous) {
-      this.dial1 += this.continuousSpeed1; // Long dial speed
-      this.dial2 += this.continuousSpeed2; // Short dial speed
+      // Update angles continuously without resetting to target
+      this.dial1 += this.continuousSpeed1;
+      this.dial2 += this.continuousSpeed2;
+      this.dial1 %= TWO_PI; // Ensure the angle wraps around
+      this.dial2 %= TWO_PI; // Ensure the angle wraps around
     } else {
       const stepSize = PI / 180;
       if (abs(this.targetDial1 - this.dial1) > stepSize) {
@@ -195,10 +199,16 @@ class Grid {
   }
 
   applyAlignmentRules() {
-    console.log("Applying rule: " + config.currentRule); // Log which rule is being applied
+    console.log("Applying rule: " + config.currentRule);
+    // Reset all to non-continuous to prevent abrupt changes from previous settings
     this.clocks.forEach((row) =>
-      row.forEach((clock) => (clock.isContinuous = false))
+      row.forEach((clock) => {
+        clock.isContinuous = false;
+        clock.continuousSpeed1 = 0;
+        clock.continuousSpeed2 = 0;
+      })
     );
+
     switch (config.currentRule) {
       case "noise":
         this.applyNoiseBasedAlignment();
@@ -214,6 +224,12 @@ class Grid {
         break;
       case "gradient":
         this.applyGradientContinuousMovement();
+        break;
+      case "wave":
+        this.applyWavePattern();
+        break;
+      case "spiral":
+        this.applySpiralPattern();
         break;
       default:
         console.log("Unknown rule: " + config.currentRule);
@@ -351,6 +367,29 @@ class Grid {
     }
   }
 
+  applySpiralPattern() {
+    const centerX = this.cols / 2;
+    const centerY = this.rows / 2;
+    let spiralFactor = 0.05; // Controls the tightness of the spiral
+
+    this.clocks.forEach((row, i) =>
+      row.forEach((clock, j) => {
+        let distance = dist(j, i, centerX, centerY);
+        let baseAngle = (distance * spiralFactor) % TWO_PI; // Base spiral angle
+
+        // Making the spiral dynamic by adding time-dependent rotation
+        let timeFactor = millis() / 1000; // Time in seconds since the sketch started
+        let angle = (baseAngle + 0.2 * timeFactor) % TWO_PI; // Continuously increase the angle over time
+
+        clock.targetDial1 = angle;
+        clock.targetDial2 = (angle + HALF_PI) % TWO_PI;
+        clock.isContinuous = true; // Keep updating continuously
+        clock.continuousSpeed1 = 0.06; // Set a nominal speed for visual effect
+        clock.continuousSpeed2 = 0.06; // Consistent with Dial1 for uniform movement
+      })
+    );
+  }
+
   display() {
     this.clocks.forEach((row) => row.forEach((clock) => clock.display()));
   }
@@ -452,7 +491,14 @@ function keyPressed() {
     config.currentTheme = themeNames[currentThemeIndex];
     console.log("Theme changed to: " + config.currentTheme);
   } else if (key === "E" || key === "e") {
-    const ruleNames = ["noise", "quarter", "rectangle", "circle", "gradient"];
+    const ruleNames = [
+      "quarter",
+      "rectangle",
+      "circle",
+      "noise",
+      "gradient",
+      "spiral",
+    ];
     let currentRuleIndex = ruleNames.indexOf(config.currentRule);
     currentRuleIndex = (currentRuleIndex + 1) % ruleNames.length;
     config.currentRule = ruleNames[currentRuleIndex];
